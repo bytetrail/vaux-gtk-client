@@ -1,0 +1,13 @@
+[package]
+name = "vaux-gtk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+vaux-client = { path = "../vaux/vaux-client" }
+vaux-mqtt = { path = "../vaux/vaux-mqtt" }
+glib = "0.20.12"
+glib-macros = "0.20.12"
+gtk4 = "0.9.7"
+uuid = "1.17.0"
+tokio = "1.45.1"

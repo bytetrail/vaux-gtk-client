@@ -14,6 +14,11 @@ const TOPIC_ENTRY_WIDTH_CHARS: i32 = 50;
 const MESSAGE_TEXT_WIDTH_REQUEST: i32 = 400;
 const MESSAGE_TEXT_HEIGHT_REQUEST: i32 = 120;
 
+const WILL_DELAY_MIN: f64 = 0.0; // 1 second
+const WILL_DELAY_MAX: f64 = 120.0; // 2 minutes
+const WILL_EXPIRY_MIN: f64 = 0.0; // 0 seconds
+const WILL_EXPIRY_MAX: f64 = 3600.0; // 1 hour
+
 pub fn build_will(client_setting: &ClientSetting) -> gtk::Frame {
     let frame = gtk::Frame::new(Some("Will Message"));
 
@@ -106,6 +111,54 @@ pub fn build_will(client_setting: &ClientSetting) -> gtk::Frame {
     will_payload_scrolled.set_min_content_height(MESSAGE_TEXT_HEIGHT_REQUEST);
     will_payload_scrolled.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     grid.attach(&will_payload_scrolled, 0, row, 2, 1);
+    row += 1;
+    // add the delay entry
+    let will_delay_label = gtk::Label::new(Some("Will Delay (seconds):"));
+    will_delay_label.set_halign(gtk::Align::End);
+    will_delay_label.set_margin_end(4);
+    grid.attach(&will_delay_label, 0, row, 1, 1);
+    let gtk_adjustment = gtk::Adjustment::new(
+        *client_setting.will_delay.borrow() as f64,
+        WILL_DELAY_MIN,
+        WILL_DELAY_MAX,
+        1.0,
+        10.0,
+        1.0,
+    );
+    let will_delay_entry = gtk::SpinButton::new(Some(&gtk_adjustment), 1.0, 0);
+    will_delay_entry.set_value(*client_setting.will_delay.borrow() as f64);
+    will_delay_entry.set_tooltip_text(Some("Delay before the Will Message is sent"));
+    will_delay_entry.set_sensitive(*will_enable.borrow());
+    let will_delay = Rc::clone(&client_setting.will_delay);
+    will_delay_entry.connect_value_changed(move |spin_button| {
+        let value = spin_button.value() as u32;
+        *(*will_delay).borrow_mut() = value;
+    });
+    grid.attach(&will_delay_entry, 1, row, 1, 1);
+    row += 1;
+    // add the expiry entry
+    let will_expiry_label = gtk::Label::new(Some("Will Expiry (seconds):"));
+    will_expiry_label.set_halign(gtk::Align::End);
+    will_expiry_label.set_margin_end(4);
+    grid.attach(&will_expiry_label, 0, row, 1, 1);
+    let gtk_adjustment = gtk::Adjustment::new(
+        *client_setting.will_expiry.borrow() as f64,
+        WILL_EXPIRY_MIN,
+        WILL_EXPIRY_MAX,
+        1.0,
+        10.0,
+        1.0,
+    );
+    let will_expiry_entry = gtk::SpinButton::new(Some(&gtk_adjustment), 1.0, 0);
+    will_expiry_entry.set_value(*client_setting.will_expiry.borrow() as f64);
+    will_expiry_entry.set_tooltip_text(Some("Expiry time for the Will Message"));
+    will_expiry_entry.set_sensitive(*will_enable.borrow());
+    let will_expiry = Rc::clone(&client_setting.will_expiry);
+    will_expiry_entry.connect_value_changed(move |spin_button| {
+        let value = spin_button.value() as u32;
+        *(*will_expiry).borrow_mut() = value;
+    });
+    grid.attach(&will_expiry_entry, 1, row, 1, 1);
 
     let will_toggle_handler = clone!(
         #[weak]
@@ -116,6 +169,10 @@ pub fn build_will(client_setting: &ClientSetting) -> gtk::Frame {
         will_topic_entry,
         #[weak]
         will_payload_text,
+        #[weak]
+        will_delay_entry,
+        #[weak]
+        will_expiry_entry,
         move |b: &gtk::CheckButton| {
             println!("Will Message toggled: {}", b.is_active());
             *(*will_enable).borrow_mut() = b.is_active();
@@ -123,6 +180,8 @@ pub fn build_will(client_setting: &ClientSetting) -> gtk::Frame {
             will_retain_toggle.set_sensitive(b.is_active());
             will_topic_entry.set_sensitive(b.is_active());
             will_payload_text.set_sensitive(b.is_active());
+            will_delay_entry.set_sensitive(b.is_active());
+            will_expiry_entry.set_sensitive(b.is_active());
         }
     );
     will_enable_toggle.connect_toggled(will_toggle_handler);
@@ -419,6 +478,7 @@ fn build_connect(
     let will_payload = Rc::clone(&client_setting.will_payload);
     let will_qos = Rc::clone(&client_setting.will_qos);
     let will_retain = Rc::clone(&client_setting.will_retain);
+    let will_delay = Rc::clone(&client_setting.will_delay);
     let will_expiry = Rc::clone(&client_setting.will_expiry);
 
     let click_handler = clone!(
@@ -447,6 +507,8 @@ fn build_connect(
                     let mut will_msg = WillMessage::new(*will_qos.borrow(), *will_retain.borrow());
                     will_msg.topic = (*will_topic).borrow().to_string();
                     will_msg.payload = (*will_payload).borrow().as_bytes().to_vec();
+                    will_msg.set_delay(*will_delay.borrow());
+                    will_msg.set_expiry(*will_expiry.borrow());
                     builder = builder.with_will_message(will_msg);
                 };
 
@@ -531,4 +593,3 @@ pub fn build_actions(
     frame.set_child(Some(&grid));
     frame
 }
-

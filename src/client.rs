@@ -1,8 +1,9 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc, time::Duration};
-use tokio::{select, sync::Mutex};
+use std::{cell::RefCell, rc::Rc, time::Duration};
+use tokio::select;
 use vaux_client::ClientBuilder;
 
-pub const DEFAULT_EXPIRY_SECONDS: u32 = 300; // 5 minutes
+pub const DEFAULT_WILL_DELAY_SECONDS: u32 = 60; // 1 minute
+pub const DEFAULT_WILL_EXPIRY_SECONDS: u32 = 300; // 5 minutes
 
 #[derive(Debug, Clone)]
 pub struct ClientSetting {
@@ -26,6 +27,7 @@ pub struct ClientSetting {
     pub will_payload: Rc<RefCell<String>>,
     pub will_qos: Rc<RefCell<vaux_mqtt::QoSLevel>>,
     pub will_retain: Rc<RefCell<bool>>,
+    pub will_delay: Rc<RefCell<u32>>,
     pub will_expiry: Rc<RefCell<u32>>,
 }
 
@@ -40,7 +42,7 @@ impl ClientSetting {
 
             host: Rc::new(RefCell::new("localhost".to_string())),
             port: Rc::new(RefCell::new(1883)),
-            session_expiry: Rc::new(RefCell::new(DEFAULT_EXPIRY_SECONDS)),
+            session_expiry: Rc::new(RefCell::new(DEFAULT_WILL_EXPIRY_SECONDS)),
             auto_ack: Rc::new(RefCell::new(true)),
             auto_packet_id: Rc::new(RefCell::new(true)),
             with_ping_resp: Rc::new(RefCell::new(false)),
@@ -49,12 +51,13 @@ impl ClientSetting {
             username: Rc::new(RefCell::new(String::new())),
             password: Rc::new(RefCell::new(String::new())),
 
-            with_will: Rc::new(RefCell::new(true)),
+            with_will: Rc::new(RefCell::new(false)),
             will_topic: Rc::new(RefCell::new(String::new())),
             will_payload: Rc::new(RefCell::new(String::new())),
             will_qos: Rc::new(RefCell::new(vaux_mqtt::QoSLevel::AtMostOnce)), // Default Qo
             will_retain: Rc::new(RefCell::new(false)),
-            will_expiry: Rc::new(RefCell::new(DEFAULT_EXPIRY_SECONDS)),
+            will_delay: Rc::new(RefCell::new(DEFAULT_WILL_DELAY_SECONDS)), // Default delay
+            will_expiry: Rc::new(RefCell::new(DEFAULT_WILL_EXPIRY_SECONDS)),
         }
     }
 }
@@ -75,11 +78,12 @@ pub async fn run(
 ) {
     let mut running = true;
     let mut client: Option<vaux_client::MqttClient> = None; // Placeholder for the client instance
-    let mut packet_consumer: Option<tokio::sync::mpsc::Receiver<vaux_mqtt::Packet>> = None; // Placeholder for the packet consumer
+    let (_dummy_tx, dummy_rx) = tokio::sync::mpsc::channel(1);
+    let mut packet_consumer: tokio::sync::mpsc::Receiver<vaux_mqtt::Packet> = dummy_rx;
 
     while running {
         select! {
-            packet = packet_consumer.as_mut().unwrap().recv(), if packet_consumer.as_ref().is_some() => {
+            packet = packet_consumer.recv() => {
                 match packet {
                     Some(p) => {
                         // Process the received packet
@@ -104,7 +108,7 @@ pub async fn run(
                                 match c.try_start(Duration::from_secs(10), true).await {
                                     Ok(_) => {
                                         // take the packet consumer
-                                        packet_consumer = c.take_packet_consumer();
+                                        packet_consumer = c.take_packet_consumer().expect("Failed to take packet consumer");
                                         client = Some(c);
                                     }
                                     Err(e) => {

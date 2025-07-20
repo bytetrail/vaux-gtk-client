@@ -16,3 +16,4 @@ This is a test client for the Vaux MQTT client and server, built using GTK4 and 
 
 (1) mTLS is currently not supported, although there is a client certificate upload UI element. mTLS support will be added to vaux client in the future.
 
+

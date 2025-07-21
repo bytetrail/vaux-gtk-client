@@ -17,3 +17,5 @@ This is a test client for the Vaux MQTT client and server, built using GTK4 and 
 (1) mTLS is currently not supported, although there is a client certificate upload UI element. mTLS support will be added to vaux client in the future.
 
 
+### Subscriptions
+Subscriptions are managed through the 'Subscriptions' tab in the main window. Users can add, remove, and manage subscriptions to various topics. Each subscription can be configured with a topic, QoS level, and whether it is active or not. Each subscription supports a single topic filter. Future versions may support multiple topic filters per subscription.

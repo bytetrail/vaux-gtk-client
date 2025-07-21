@@ -1,13 +1,9 @@
-use std::{
-    borrow::Borrow,
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 use gtk::prelude::*;
 use gtk4::{
     self as gtk,
-    gio::{self, ListModel},
+    gio::{self},
 };
 
 use crate::model::PacketObject;

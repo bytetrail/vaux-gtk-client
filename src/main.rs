@@ -76,7 +76,7 @@ fn main() -> glib::ExitCode {
         sess_grid.set_hexpand(true);
         let mut row = 0;
 
-        let client_setting_frame = ui::build_settings(&client_setting);
+        let (client_setting_frame, clean_start_check) = ui::build_settings(&client_setting);
         sess_grid.attach(&client_setting_frame, 0, row, 1, 1);
         let will_frame = ui::build_will(&client_setting);
         sess_grid.attach(&will_frame, 1, row, 1, 1);
@@ -94,9 +94,8 @@ fn main() -> glib::ExitCode {
         );
         sess_grid.attach(&credentials_frame, 1, row, 1, 1);
         session_frame.set_child(Some(&sess_grid));
-        row += 1;
 
-        let connect_frame = ui::build_actions(cmd_tx.clone(), &client_setting);
+        let connect_frame = ui::build_actions(&clean_start_check, cmd_tx.clone(), &client_setting);
         main_box.append(&connect_frame);
 
         let message_frame = message::build_message_view(Rc::clone(&message_model));

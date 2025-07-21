@@ -191,7 +191,7 @@ pub fn build_will(client_setting: &ClientSetting) -> gtk::Frame {
     frame
 }
 
-pub fn build_settings(client_setting: &ClientSetting) -> gtk::Frame {
+pub fn build_settings(client_setting: &ClientSetting) -> (gtk::Frame, gtk::CheckButton) {
     // Grid for MQTT client settings controls
 
     let frame = gtk::Frame::new(Some("Client Settings"));
@@ -206,6 +206,22 @@ pub fn build_settings(client_setting: &ClientSetting) -> gtk::Frame {
 
     let mut row = 0;
 
+    let clean_start_check = gtk::CheckButton::new();
+    clean_start_check.set_label(Some("Clean Start"));
+    clean_start_check.set_halign(gtk::Align::Start);
+    clean_start_check.set_tooltip_text(Some("Enable clean start when existing session is present"));
+    clean_start_check.set_sensitive((*client_setting.clean_start.borrow()).is_some());
+    let _clean_start = Rc::clone(&client_setting.clean_start);
+    clean_start_check.connect_toggled(move |button: &gtk::CheckButton| {
+        if button.is_active() {
+            *(*_clean_start).borrow_mut() = Some(true);
+        } else {
+            *(*_clean_start).borrow_mut() = Some(false);
+        }
+    });
+    grid.attach(&clean_start_check, 1, row, 1, 1);
+    row += 1;
+
     let label = gtk::Label::new(Some("Client ID:"));
     label.set_halign(gtk4::Align::End);
     label.set_margin_end(4);
@@ -215,7 +231,7 @@ pub fn build_settings(client_setting: &ClientSetting) -> gtk::Frame {
     client_id_entry.connect_changed(move |entry| {
         *(*_client_id).borrow_mut() = entry.text().to_string();
     });
-    grid.attach(&label, 0, 0, 1, 1);
+    grid.attach(&label, 0, row, 1, 1);
     grid.attach(&client_id_entry, 1, row, 1, 1);
     row += 1;
 
@@ -297,9 +313,8 @@ pub fn build_settings(client_setting: &ClientSetting) -> gtk::Frame {
         *(*_with_ping_resp).borrow_mut() = button.is_active();
     });
     grid.attach(&with_ping_resp, 1, row, 1, 1);
-    row += 1;
 
-    frame
+    (frame, clean_start_check)
 }
 
 pub fn build_tls(
@@ -458,6 +473,7 @@ pub fn build_credentials(
 
 fn build_connect(
     ping: &gtk::Button,
+    clean_start_check: &gtk::CheckButton,
     client_setting: &ClientSetting,
     cmd_tx: tokio::sync::mpsc::Sender<Command>,
 ) -> gtk::ToggleButton {
@@ -482,6 +498,8 @@ fn build_connect(
     let will_expiry = Rc::clone(&client_setting.will_expiry);
 
     let click_handler = clone!(
+        #[weak]
+        clean_start_check,
         #[weak]
         ping,
         move |b: &gtk::ToggleButton| {
@@ -544,6 +562,8 @@ fn build_connect(
                         println!("Failed to disconnect MQTT Client: {}", e);
                     }
                 }
+                // Reset the clean start checkbox
+                clean_start_check.set_sensitive(true);
             }
         }
     );
@@ -553,6 +573,7 @@ fn build_connect(
 }
 
 pub fn build_actions(
+    clean_start_check: &gtk::CheckButton,
     cmd_tx: tokio::sync::mpsc::Sender<Command>,
     client_settings: &ClientSetting,
 ) -> gtk::Frame {
@@ -570,7 +591,12 @@ pub fn build_actions(
 
     let ping_button = gtk::Button::with_label("Ping");
 
-    let conn_button = build_connect(&ping_button, client_settings, cmd_tx.clone());
+    let conn_button = build_connect(
+        &ping_button,
+        clean_start_check,
+        client_settings,
+        cmd_tx.clone(),
+    );
     grid.attach(&conn_button, 0, row, 2, 1);
     row += 1;
 

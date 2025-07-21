@@ -7,6 +7,7 @@ pub const DEFAULT_WILL_EXPIRY_SECONDS: u32 = 300; // 5 minutes
 
 #[derive(Debug, Clone)]
 pub struct ClientSetting {
+    pub clean_start: Rc<RefCell<Option<bool>>>,
     pub client_id: Rc<RefCell<String>>,
     pub with_tls: Rc<RefCell<bool>>,
     pub ca_file: Rc<RefCell<String>>,
@@ -34,6 +35,7 @@ pub struct ClientSetting {
 impl ClientSetting {
     pub fn new() -> Self {
         Self {
+            clean_start: Rc::new(RefCell::new(None)),
             client_id: Rc::new(RefCell::new(format!("client-{}", uuid::Uuid::new_v4()))),
 
             with_tls: Rc::new(RefCell::new(false)),
@@ -92,7 +94,6 @@ pub async fn run(
                         mqtt_tx.send(p).await.expect("Failed to send packet");
                     }
                     None => {
-                        println!("Packet consumer channel closed");
                     }
                 }
             }
@@ -145,6 +146,9 @@ pub async fn run(
                     Some(Command::StopClient) => {
                         // Logic to stop the client
                         println!("MQTT Client stopped");
+                        // Reset the packet consumer to a dummy receiver
+                        let (_dummy_tx, dummy_rx) = tokio::sync::mpsc::channel(1);
+                        packet_consumer = dummy_rx; // Reset the packet consumer
                         if let Some(mut c) = client.take() {
                             if let Err(e) = c.stop().await {
                                 eprintln!("Failed to stop MQTT Client: {}", e);

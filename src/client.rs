@@ -106,7 +106,7 @@ pub async fn run(
                             .with_state(conn, session.take()
                             .expect("No session to resume"))
                             .build().await.expect("Failed to build client");
-                        match c.try_start(Duration::from_secs(10), true).await {
+                        match c.try_start(Duration::from_secs(10), false).await {
                             Ok(h) => {
                                 handle = Some(h);
                                 // take the packet consumer

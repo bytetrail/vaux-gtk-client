@@ -207,9 +207,11 @@ pub fn build_settings(client_setting: &ClientSetting) -> (gtk::Frame, gtk::Check
     let mut row = 0;
 
     let clean_start_check = gtk::CheckButton::new();
-    clean_start_check.set_label(Some("Clean Start"));
+    clean_start_check.set_label(Some("Resume Session"));
     clean_start_check.set_halign(gtk::Align::Start);
-    clean_start_check.set_tooltip_text(Some("Enable clean start when existing session is present"));
+    clean_start_check.set_tooltip_text(Some(
+        "Resume prior session when present, otherwise clean start",
+    ));
     clean_start_check.set_sensitive((*client_setting.clean_start.borrow()).is_some());
     let _clean_start = Rc::clone(&client_setting.clean_start);
     clean_start_check.connect_toggled(move |button: &gtk::CheckButton| {
@@ -515,36 +517,60 @@ fn build_connect(
                     connection = connection
                         .with_credentials(username.borrow().as_str(), password.borrow().as_str());
                 }
-                let mut builder = vaux_client::ClientBuilder::new(connection)
-                    .with_client_id((*client_id).borrow().as_str())
-                    .with_session_expiry(Duration::from_secs(*session_expiry.borrow() as u64))
-                    .with_auto_ack(*auto_ack.borrow())
-                    .with_auto_packet_id(*auto_packet_id.borrow())
-                    .with_pingresp(*with_ping_resp.borrow());
-                if *with_will.borrow() {
-                    let mut will_msg = WillMessage::new(*will_qos.borrow(), *will_retain.borrow());
-                    will_msg.topic = (*will_topic).borrow().to_string();
-                    will_msg.payload = (*will_payload).borrow().as_bytes().to_vec();
-                    will_msg.set_delay(*will_delay.borrow());
-                    will_msg.set_expiry(*will_expiry.borrow());
-                    builder = builder.with_will_message(will_msg);
-                };
 
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .unwrap();
-                match rt
-                    .block_on(async { cmd_tx.send(client::Command::StartClient(builder)).await })
-                {
-                    Ok(_) => {
-                        println!("MQTT Client connected successfully");
-                        ping.set_sensitive(true);
+                if clean_start_check.is_active() {
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap();
+                    match rt.block_on(async {
+                        cmd_tx
+                            .send(client::Command::ResumeSession(connection))
+                            .await
+                    }) {
+                        Ok(_) => {
+                            println!("MQTT Client connected successfully");
+                            ping.set_sensitive(true);
+                        }
+                        Err(e) => {
+                            println!("Failed to connect MQTT Client: {e}");
+                            b.set_active(false); // Reset button state on failure
+                            return;
+                        }
                     }
-                    Err(e) => {
-                        println!("Failed to connect MQTT Client: {e}");
-                        b.set_active(false); // Reset button state on failure
-                        return;
+                } else {
+                    let mut builder = vaux_client::ClientBuilder::new(connection)
+                        .with_client_id((*client_id).borrow().as_str())
+                        .with_session_expiry(Duration::from_secs(*session_expiry.borrow() as u64))
+                        .with_auto_ack(*auto_ack.borrow())
+                        .with_auto_packet_id(*auto_packet_id.borrow())
+                        .with_pingresp(*with_ping_resp.borrow());
+                    if *with_will.borrow() {
+                        let mut will_msg =
+                            WillMessage::new(*will_qos.borrow(), *will_retain.borrow());
+                        will_msg.topic = (*will_topic).borrow().to_string();
+                        will_msg.payload = (*will_payload).borrow().as_bytes().to_vec();
+                        will_msg.set_delay(*will_delay.borrow());
+                        will_msg.set_expiry(*will_expiry.borrow());
+                        builder = builder.with_will_message(will_msg);
+                    };
+
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap();
+                    match rt.block_on(async {
+                        cmd_tx.send(client::Command::StartClient(builder)).await
+                    }) {
+                        Ok(_) => {
+                            println!("MQTT Client connected successfully");
+                            ping.set_sensitive(true);
+                        }
+                        Err(e) => {
+                            println!("Failed to connect MQTT Client: {e}");
+                            b.set_active(false); // Reset button state on failure
+                            return;
+                        }
                     }
                 }
             } else {

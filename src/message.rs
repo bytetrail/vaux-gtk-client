@@ -44,8 +44,8 @@ pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Fr
         label.set_text(&packet.packet_type().to_string());
     });
 
-    let foo = (*message_model.clone()).borrow().clone();
-    let selection_model = gtk::SingleSelection::new(Some(foo));
+    let model = (*message_model.clone()).borrow().clone();
+    let selection_model = gtk::SingleSelection::new(Some(model));
     let list_view = gtk::ListView::new(Some(selection_model), Some(factory));
     list_view.set_hexpand(true);
 

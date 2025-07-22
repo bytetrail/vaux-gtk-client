@@ -9,9 +9,8 @@ glib::wrapper! {
 
 impl PacketObject {
     pub fn new(packet: vaux_mqtt::Packet) -> Self {
-        let obj = Object::builder()
+        Object::builder()
             .property("packet-type", PacketType::from(&packet).to_string())
-            .build();
-        obj
+            .build()
     }
 }

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use gtk4::{self as gtk};
 
@@ -517,7 +517,7 @@ fn build_connect(
                 }
                 let mut builder = vaux_client::ClientBuilder::new(connection)
                     .with_client_id((*client_id).borrow().as_str())
-                    .with_session_expiry(*session_expiry.borrow())
+                    .with_session_expiry(Duration::from_secs(*session_expiry.borrow() as u64))
                     .with_auto_ack(*auto_ack.borrow())
                     .with_auto_packet_id(*auto_packet_id.borrow())
                     .with_pingresp(*with_ping_resp.borrow());
@@ -542,7 +542,7 @@ fn build_connect(
                         ping.set_sensitive(true);
                     }
                     Err(e) => {
-                        println!("Failed to connect MQTT Client: {}", e);
+                        println!("Failed to connect MQTT Client: {e}");
                         b.set_active(false); // Reset button state on failure
                         return;
                     }
@@ -559,7 +559,7 @@ fn build_connect(
                         println!("MQTT Client disconnected successfully");
                     }
                     Err(e) => {
-                        println!("Failed to disconnect MQTT Client: {}", e);
+                        println!("Failed to disconnect MQTT Client: {e}");
                     }
                 }
                 // Reset the clean start checkbox
@@ -611,7 +611,7 @@ pub fn build_actions(
         match rt.block_on(async { cmd_tx.send(client::Command::Ping).await }) {
             Ok(_) => {}
             Err(e) => {
-                println!("Failed to send ping command: {}", e);
+                println!("Failed to send ping command: {e}");
             }
         }
     });

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
-use tokio::select;
-use vaux_client::ClientBuilder;
+use tokio::{select, task::JoinHandle};
+use vaux_client::{ClientBuilder, MqttConnection, client::ClientError, session::SessionState};
 
 pub const DEFAULT_WILL_DELAY_SECONDS: u32 = 60; // 1 minute
 pub const DEFAULT_WILL_EXPIRY_SECONDS: u32 = 300; // 5 minutes
@@ -66,6 +66,7 @@ impl ClientSetting {
 
 pub enum Command {
     StartClient(ClientBuilder),
+    ResumeSession(MqttConnection),
     Ping,
     Publish(String, String), // topic, payload
     Subscribe(String),       // topic
@@ -83,22 +84,40 @@ pub async fn run(
     let (_dummy_tx, dummy_rx) = tokio::sync::mpsc::channel(1);
     let mut packet_consumer: tokio::sync::mpsc::Receiver<vaux_mqtt::Packet> = dummy_rx;
 
+    let mut session: Option<vaux_client::session::SessionState> = None;
+    let mut handle: Option<JoinHandle<Result<SessionState, ClientError>>> = None;
+
     while running {
         select! {
             packet = packet_consumer.recv() => {
-                match packet {
-                    Some(p) => {
+                if let Some(p) = packet {
                         // Process the received packet
-                        println!("Received packet: {:?}", p);
+                        println!("Received packet: {p:?}");
                         // Here you can handle the packet, e.g., update UI or store it
                         mqtt_tx.send(p).await.expect("Failed to send packet");
-                    }
-                    None => {
-                    }
                 }
             }
             command = cmd_channel.recv() => {
                 match command {
+                    Some(Command::ResumeSession(conn)) => {
+                        // Logic to resume the session
+                        println!("Resuming session");
+                        let mut c = vaux_client::ClientBuilder::default()
+                            .with_state(conn, session.take()
+                            .expect("No session to resume"))
+                            .build().await.expect("Failed to build client");
+                        match c.try_start(Duration::from_secs(10), true).await {
+                            Ok(h) => {
+                                handle = Some(h);
+                                // take the packet consumer
+                                packet_consumer = c.take_packet_consumer().expect("Failed to take packet consumer");
+                                client = Some(c);
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to connect MQTT Client: {e}");
+                            }
+                        }
+                    }
                     Some(Command::StartClient(builder)) => {
                         // Logic to start the client
                         println!("MQTT Client started with builder");
@@ -107,25 +126,26 @@ pub async fn run(
                                 println!("MQTT Client connected successfully");
                                 // attempt to connect the client
                                 match c.try_start(Duration::from_secs(10), true).await {
-                                    Ok(_) => {
+                                    Ok(h) => {
+                                        handle = Some(h);
                                         // take the packet consumer
                                         packet_consumer = c.take_packet_consumer().expect("Failed to take packet consumer");
                                         client = Some(c);
                                     }
                                     Err(e) => {
-                                        eprintln!("Failed to connect MQTT Client: {}", e);
+                                        eprintln!("Failed to connect MQTT Client: {e}");
                                     }
                                 }
                             }
                             Err(e) => {
-                                eprintln!("Failed to start MQTT Client: {}", e);
+                                eprintln!("Failed to start MQTT Client: {e}");
                             }
                         }
                     }
                     Some(Command::Ping) => {
                         if let Some(ref mut c) = client {
                             if let Err(e) = c.ping().await {
-                                eprintln!("Failed to send ping: {}", e);
+                                eprintln!("Failed to send ping: {e}");
                             }
                         } else {
                             eprintln!("Client not initialized, cannot send ping");
@@ -133,15 +153,15 @@ pub async fn run(
                     }
                     Some(Command::Publish(topic, payload)) => {
                         // Logic to publish a message
-                        println!("Published to topic '{}': {}", topic, payload);
+                        println!("Published to topic '{topic}': {payload}");
                     }
                     Some(Command::Subscribe(topic)) => {
                         // Logic to subscribe to a topic
-                        println!("Subscribed to topic '{}'", topic);
+                        println!("Subscribed to topic '{topic}'" );
                     }
                     Some(Command::Unsubscribe(topic)) => {
                         // Logic to unsubscribe from a topic
-                        println!("Unsubscribed from topic '{}'", topic);
+                        println!("Unsubscribed from topic '{topic}'");
                     }
                     Some(Command::StopClient) => {
                         // Logic to stop the client
@@ -151,12 +171,25 @@ pub async fn run(
                         packet_consumer = dummy_rx; // Reset the packet consumer
                         if let Some(mut c) = client.take() {
                             if let Err(e) = c.stop().await {
-                                eprintln!("Failed to stop MQTT Client: {}", e);
+                                eprintln!("Failed to stop MQTT Client: {e}");
                             } else {
                                 println!("MQTT Client stopped successfully");
                             }
                         } else {
                             println!("No MQTT Client to stop");
+                        }
+                        // join the handle if it exists
+                        if let Some(h) = handle.take() {
+                            match h.await {
+                                Ok(r) => {
+                                     println!("Client session ended successfully");
+                                     match r {
+                                        Ok(s) => session = Some(s),
+                                        Err(e) => eprintln!("Error in client session: {e}"),
+                                     }
+                                }
+                                Err(e) => eprintln!("Error while ending client session: {e}"),
+                            }
                         }
                     }
                     Some(Command::StopRunner) => {

@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 use tokio::{select, task::JoinHandle};
 use vaux_client::{ClientBuilder, MqttConnection, client::ClientError, session::SessionState};
+use vaux_mqtt::QoSLevel;
 
 pub const DEFAULT_WILL_DELAY_SECONDS: u32 = 60; // 1 minute
 pub const DEFAULT_WILL_EXPIRY_SECONDS: u32 = 300; // 5 minutes
@@ -68,9 +69,9 @@ pub enum Command {
     StartClient(ClientBuilder),
     ResumeSession(MqttConnection),
     Ping,
-    Publish(String, String), // topic, payload
-    Subscribe(String),       // topic
-    Unsubscribe(String),     // topic
+    Publish(String, String),          // topic, payload
+    Subscribe(u16, QoSLevel, String), // topic
+    Unsubscribe(String),              // topic
     StopClient,
     StopRunner,
 }
@@ -155,9 +156,18 @@ pub async fn run(
                         // Logic to publish a message
                         println!("Published to topic '{topic}': {payload}");
                     }
-                    Some(Command::Subscribe(topic)) => {
+                    Some(Command::Subscribe(packet_id, qos_level, topic)) => {
                         // Logic to subscribe to a topic
                         println!("Subscribed to topic '{topic}'" );
+                        if let Some(ref mut c) = client {
+                            let topic_list = vec![topic.as_str()];
+                            match c.subscribe(packet_id, topic_list.as_slice(), qos_level).await {
+                                Ok(_) => println!("Subscription request sent for topic '{topic}'"),
+                                Err(e) => eprintln!("Failed to send subscription request: {e}"),
+                            }
+                        } else {
+                            eprintln!("Client not initialized, cannot subscribe");
+                        }
                     }
                     Some(Command::Unsubscribe(topic)) => {
                         // Logic to unsubscribe from a topic

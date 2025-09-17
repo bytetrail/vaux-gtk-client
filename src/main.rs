@@ -99,6 +99,8 @@ fn main() -> glib::ExitCode {
         main_box.append(&connect_frame);
 
         let message_frame = message::build_message_view(Rc::clone(&message_model));
+        message_frame.set_vexpand(true);
+
         main_box.append(&message_frame);
 
         let packet = PacketObject::new(Packet::PingResponse(FixedHeader::new(

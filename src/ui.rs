@@ -10,7 +10,7 @@ use crate::client::{self, ClientSetting, Command};
 
 const FRAME_MARGIN: i32 = 6;
 const FILE_ENTRY_WIDTH_CHARS: i32 = 50;
-const TOPIC_ENTRY_WIDTH_CHARS: i32 = 50;
+const TOPIC_ENTRY_WIDTH_CHARS: i32 = 80;
 const MESSAGE_TEXT_WIDTH_REQUEST: i32 = 400;
 const MESSAGE_TEXT_HEIGHT_REQUEST: i32 = 120;
 
@@ -617,7 +617,6 @@ pub fn build_actions(
 
     let ping_button = gtk::Button::with_label("Ping");
     // Make Ping button same width as Connect/Disconnect button
-    ping_button.set_hexpand(true);
     ping_button.set_sensitive(false); // Initially disabled
     let conn_button = build_connect(
         &ping_button,
@@ -625,25 +624,28 @@ pub fn build_actions(
         client_settings,
         cmd_tx.clone(),
     );
-    grid.attach(&conn_button, 0, row, 2, 1);
+    grid.attach(&conn_button, 0, row, 1, 1);
     // attach the subscribe frame to column 1, row, 0, 3 rows height
     let subscribe_frame = build_subscribe(cmd_tx.clone());
-    grid.attach(&subscribe_frame, 2, 0, 1, 3);
-    row += 1;
-    grid.attach(&ping_button, 0, row, 2, 1);
-    let cmd_tx = cmd_tx.clone();
+    grid.attach(&subscribe_frame, 1, 0, 3, 3);
+
+    grid.attach(&ping_button, 0, 1, 1, 1);
+    let _cmd_tx = cmd_tx.clone();
     ping_button.connect_clicked(move |_| {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
-        match rt.block_on(async { cmd_tx.send(client::Command::Ping).await }) {
+        match rt.block_on(async { _cmd_tx.send(client::Command::Ping).await }) {
             Ok(_) => {}
             Err(e) => {
                 println!("Failed to send ping command: {e}");
             }
         }
     });
+    row += 1;
+    let unsubscribe_frame = build_unsubscribe(cmd_tx.clone());
+    grid.attach(&unsubscribe_frame, 1, 3, 3, 3);
 
     frame.set_child(Some(&grid));
     frame
@@ -739,5 +741,76 @@ fn build_subscribe(cmd_tx: tokio::sync::mpsc::Sender<Command>) -> gtk::Frame {
         }
     });
 
+    frame
+}
+
+fn build_unsubscribe(cmd_tx: tokio::sync::mpsc::Sender<Command>) -> gtk::Frame {
+    let frame = gtk::Frame::new(Some("Unsubscribe"));
+    let grid = gtk::Grid::new();
+    grid.set_column_spacing(4);
+    grid.set_row_spacing(4);
+    grid.set_margin_bottom(FRAME_MARGIN);
+    grid.set_margin_start(FRAME_MARGIN);
+    grid.set_margin_end(FRAME_MARGIN);
+    frame.set_child(Some(&grid));
+
+    let mut row = 0;
+
+    // Unsubscription controls
+    let packet_id_label = gtk::Label::new(Some("Packet ID:"));
+    packet_id_label.set_halign(gtk::Align::End);
+    packet_id_label.set_margin_end(4);
+    grid.attach(&packet_id_label, 0, row, 1, 1);
+    let gtk_adjustment = gtk::Adjustment::new(1.0, 1.0, 65535.0, 1.0, 10.0, 1.0);
+    let packet_id_entry = gtk::SpinButton::new(Some(&gtk_adjustment), 1.0, 0);
+    packet_id_entry.set_tooltip_text(Some("Packet ID for the Unsubscription"));
+    packet_id_entry.set_width_chars(6);
+    grid.attach(&packet_id_entry, 1, row, 1, 1);
+    let packet_id = Rc::new(RefCell::new(1u16));
+    let packet_id_clone = Rc::clone(&packet_id);
+    packet_id_entry.connect_value_changed(move |spin_button| {
+        let value = spin_button.value() as u16;
+        *packet_id_clone.borrow_mut() = value;
+    });
+    row += 1;
+
+    let topic_entry = gtk::Entry::new();
+    topic_entry.set_placeholder_text(Some("Topic to unsubscribe from"));
+    topic_entry.set_tooltip_text(Some("Topic to unsubscribe from"));
+    topic_entry.set_width_chars(TOPIC_ENTRY_WIDTH_CHARS);
+    grid.attach(&topic_entry, 0, row, 2, 1);
+    row += 1;
+    let unsubscribe_button = gtk::Button::with_label("Unsubscribe");
+    unsubscribe_button.set_halign(gtk::Align::End);
+    grid.attach(&unsubscribe_button, 1, row, 1, 1);
+
+    let topic_entry_clone = topic_entry.clone();
+    unsubscribe_button.connect_clicked(move |_| {
+        let topic = topic_entry_clone.text().to_string();
+        let packet_id = *packet_id.borrow();
+        // create a subscription filter for the settings
+        if topic.is_empty() {
+            println!("Topic is empty, cannot unsubscribe");
+            return;
+        }
+        println!("Unsubscribing from topic: {}", topic);
+        // create an unsubscribe command and send it
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        match rt.block_on(async {
+            cmd_tx
+                .send(client::Command::Unsubscribe(packet_id, topic))
+                .await
+        }) {
+            Ok(_) => {
+                println!("Unsubscribe command sent");
+            }
+            Err(e) => {
+                println!("Failed to send unsubscribe command: {e}");
+            }
+        }
+    });
     frame
 }

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 use tokio::{select, task::JoinHandle};
 use vaux_client::{ClientBuilder, MqttConnection, client::ClientError, session::SessionState};
-use vaux_mqtt::QoSLevel;
+use vaux_mqtt::{QoSLevel, unsubscribe};
 
 pub const DEFAULT_WILL_DELAY_SECONDS: u32 = 60; // 1 minute
 pub const DEFAULT_WILL_EXPIRY_SECONDS: u32 = 300; // 5 minutes
@@ -71,7 +71,7 @@ pub enum Command {
     Ping,
     Publish(String, String),          // topic, payload
     Subscribe(u16, QoSLevel, String), // topic
-    Unsubscribe(String),              // topic
+    Unsubscribe(u16, String),         // topic
     StopClient,
     StopRunner,
 }
@@ -169,9 +169,18 @@ pub async fn run(
                             eprintln!("Client not initialized, cannot subscribe");
                         }
                     }
-                    Some(Command::Unsubscribe(topic)) => {
+                    Some(Command::Unsubscribe(packet_id, topic)) => {
                         // Logic to unsubscribe from a topic
                         println!("Unsubscribed from topic '{topic}'");
+                        let unsub = unsubscribe::Unsubscribe::new(packet_id, vec![topic]);
+                        if let Some(ref mut c) = client {
+                            c.packet_producer()
+                            .send(vaux_mqtt::Packet::Unsubscribe(unsub))
+                            .await
+                            .expect("Failed to send unsubscribe packet");
+                        } else {
+                            eprintln!("Client not initialized, cannot unsubscribe");
+                        }
                     }
                     Some(Command::StopClient) => {
                         // Logic to stop the client

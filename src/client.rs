@@ -73,6 +73,7 @@ pub enum Command {
     Subscribe(u16, QoSLevel, String), // topic
     Unsubscribe(u16, String),         // topic
     StopClient,
+    #[allow(dead_code)]
     StopRunner,
 }
 

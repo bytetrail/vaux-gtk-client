@@ -5,7 +5,7 @@ use gtk4::{self as gtk};
 use glib_macros::clone;
 use gtk::prelude::*;
 
-use crate::client::{ClientSetting, Command};
+use crate::client::ClientSetting;
 
 const FRAME_MARGIN: i32 = 6;
 const FILE_ENTRY_WIDTH_CHARS: i32 = 50;

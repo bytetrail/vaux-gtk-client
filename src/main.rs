@@ -1,6 +1,4 @@
-mod action;
 mod client;
-mod message;
 mod model;
 mod ui;
 
@@ -15,6 +13,7 @@ use vaux_mqtt::{FixedHeader, Packet};
 
 use crate::client::ClientSetting;
 use crate::model::PacketObject;
+use crate::ui::{build_actions, build_message_view};
 
 fn main() -> glib::ExitCode {
     let (cmd_tx, cmd_rx) = tokio::sync::mpsc::channel(32);
@@ -96,11 +95,10 @@ fn main() -> glib::ExitCode {
         sess_grid.attach(&credentials_frame, 1, row, 1, 1);
         session_frame.set_child(Some(&sess_grid));
 
-        let connect_frame =
-            action::build_actions(&clean_start_check, cmd_tx.clone(), &client_setting);
+        let connect_frame = build_actions(&clean_start_check, cmd_tx.clone(), &client_setting);
         main_box.append(&connect_frame);
 
-        let message_frame = message::build_message_view(Rc::clone(&message_model));
+        let message_frame = build_message_view(Rc::clone(&message_model));
         message_frame.set_vexpand(true);
 
         main_box.append(&message_frame);

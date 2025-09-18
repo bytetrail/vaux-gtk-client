@@ -13,7 +13,7 @@ const TOPIC_ENTRY_WIDTH_CHARS: i32 = 80;
 const PUBLISH_TEXT_WIDTH_REQUEST: i32 = 300;
 const PUBLISH_TEXT_HEIGHT_REQUEST: i32 = 120;
 
-pub(crate) fn build_actions(
+pub fn build_actions(
     clean_start_check: &gtk::CheckButton,
     cmd_tx: tokio::sync::mpsc::Sender<Command>,
     client_settings: &ClientSetting,
@@ -28,7 +28,7 @@ pub(crate) fn build_actions(
     grid.set_vexpand(false);
     grid.set_hexpand(true);
 
-    let mut row = 0;
+    let row = 0;
 
     let ping_button = gtk::Button::with_label("Ping");
     // Make Ping button same width as Connect/Disconnect button
@@ -57,15 +57,27 @@ pub(crate) fn build_actions(
     });
 
     // attach the subscribe frame to column 1, row, 0, 3 rows height
-    let subscribe_frame = build_subscribe(cmd_tx.clone());
-    grid.attach(&subscribe_frame, 1, 0, 1, 3);
-    let unsubscribe_frame = build_unsubscribe(cmd_tx.clone());
-    grid.attach(&unsubscribe_frame, 1, 3, 1, 3);
-    let publish_frame = build_publish(cmd_tx.clone());
-    grid.attach(&publish_frame, 2, 0, 1, 3);
+    let notebook = build_action_notebook(cmd_tx);
+    grid.attach(&notebook, 1, 0, 1, 3);
 
     frame.set_child(Some(&grid));
     frame
+}
+
+pub fn build_action_notebook(cmd_tx: tokio::sync::mpsc::Sender<Command>) -> gtk::Notebook {
+    let notebook = gtk::Notebook::new();
+    notebook.set_tab_pos(gtk::PositionType::Top);
+    notebook.set_hexpand(true);
+    notebook.set_vexpand(false);
+
+    let pub_frame = build_publish(cmd_tx.clone());
+    notebook.append_page(&pub_frame, Some(&gtk::Label::new(Some("Publish"))));
+    let sub_frame = build_subscribe(cmd_tx.clone());
+    notebook.append_page(&sub_frame, Some(&gtk::Label::new(Some("Subscribe"))));
+    let unsub_frame = build_unsubscribe(cmd_tx);
+    notebook.append_page(&unsub_frame, Some(&gtk::Label::new(Some("Unsubscribe"))));
+
+    notebook
 }
 
 pub(crate) fn build_subscribe(cmd_tx: tokio::sync::mpsc::Sender<Command>) -> gtk::Frame {

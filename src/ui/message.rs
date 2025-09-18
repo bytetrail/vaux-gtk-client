@@ -58,7 +58,7 @@ pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Fr
             .and_downcast::<gtk::Label>()
             .expect("Failed to get id_label");
 
-        let mut id_str = String::new();
+        let id_str: String;
         packet_label.set_text(&packet.packet_type().to_string());
         id_label.set_text(if &packet.packet_id() == &0 {
             "-"

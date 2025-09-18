@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 use tokio::{select, task::JoinHandle};
 use vaux_client::{ClientBuilder, MqttConnection, client::ClientError, session::SessionState};
-use vaux_mqtt::{QoSLevel, unsubscribe};
+use vaux_mqtt::{QoSLevel, publish::Publish, unsubscribe};
 
 pub const DEFAULT_WILL_DELAY_SECONDS: u32 = 60; // 1 minute
 pub const DEFAULT_WILL_EXPIRY_SECONDS: u32 = 300; // 5 minutes
@@ -48,7 +48,7 @@ impl ClientSetting {
             session_expiry: Rc::new(RefCell::new(DEFAULT_WILL_EXPIRY_SECONDS)),
             auto_ack: Rc::new(RefCell::new(true)),
             auto_packet_id: Rc::new(RefCell::new(true)),
-            with_ping_resp: Rc::new(RefCell::new(false)),
+            with_ping_resp: Rc::new(RefCell::new(true)),
 
             with_credentials: Rc::new(RefCell::new(false)),
             username: Rc::new(RefCell::new(String::new())),
@@ -69,7 +69,7 @@ pub enum Command {
     StartClient(ClientBuilder),
     ResumeSession(MqttConnection),
     Ping,
-    Publish(String, String),          // topic, payload
+    Publish(Publish),                 // publish packet
     Subscribe(u16, QoSLevel, String), // topic
     Unsubscribe(u16, String),         // topic
     StopClient,
@@ -94,6 +94,15 @@ pub async fn run(
                 if let Some(p) = packet {
                         // Process the received packet
                         println!("Received packet: {p:?}");
+                        match &p {
+                            vaux_mqtt::Packet::UnsubAck(ack) => {
+                                println!("UnsubAck received for packet ID: {}", ack.packet_id());
+                                for (i, code) in ack.reason_code().iter().enumerate() {
+                                    println!("  Reason code {}: {:?}", i + 1, code);
+                                }
+                            }
+                            _ => {}
+                        }
                         // Here you can handle the packet, e.g., update UI or store it
                         mqtt_tx.send(p).await.expect("Failed to send packet");
                 }
@@ -152,9 +161,17 @@ pub async fn run(
                             eprintln!("Client not initialized, cannot send ping");
                         }
                     }
-                    Some(Command::Publish(topic, payload)) => {
-                        // Logic to publish a message
-                        println!("Published to topic '{topic}': {payload}");
+                    Some(Command::Publish(publish))=> {
+                        let packet = vaux_mqtt::Packet::Publish(publish);
+                        println!("Publishing packet: {packet:?}");
+                        if let Some(ref mut c) = client {
+                            c.packet_producer()
+                            .send(packet)
+                            .await
+                            .expect("Failed to send publish packet");
+                        } else {
+                            eprintln!("Client not initialized, cannot publish");
+                        }
                     }
                     Some(Command::Subscribe(packet_id, qos_level, topic)) => {
                         // Logic to subscribe to a topic

@@ -21,10 +21,18 @@ pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Fr
 
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(move |_, item| {
-        let label = gtk::Label::new(None);
+        let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 5);
+        let packet_label = gtk::Label::new(None);
+        packet_label.set_hexpand(false);
+        hbox.append(&packet_label);
+        let id_label = gtk::Label::new(None);
+        id_label.set_margin_start(10);
+        id_label.set_hexpand(true);
+        hbox.append(&id_label);
+
         item.downcast_ref::<gtk::ListItem>()
             .expect("Failed to downcast")
-            .set_child(Some(&label));
+            .set_child(Some(&hbox));
     });
     factory.connect_bind(move |_, item| {
         let packet = item
@@ -34,14 +42,30 @@ pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Fr
             .and_downcast::<PacketObject>()
             .expect("Failed to downcast to PacketObject");
 
-        let label = item
+        let hbox = item
             .downcast_ref::<gtk::ListItem>()
             .expect("Failed to downcast")
             .child()
-            .and_downcast::<gtk::Label>()
-            .expect("Failed to downcast to Label");
+            .and_downcast::<gtk::Box>()
+            .expect("Failed to downcast to Box");
 
-        label.set_text(&packet.packet_type().to_string());
+        let packet_label = hbox
+            .first_child()
+            .and_downcast::<gtk::Label>()
+            .expect("Failed to get packet_label");
+        let id_label = hbox
+            .last_child()
+            .and_downcast::<gtk::Label>()
+            .expect("Failed to get id_label");
+
+        let mut id_str = String::new();
+        packet_label.set_text(&packet.packet_type().to_string());
+        id_label.set_text(if &packet.packet_id() == &0 {
+            "-"
+        } else {
+            id_str = packet.packet_id().to_string();
+            id_str.as_str()
+        });
     });
 
     let model = (*message_model.clone()).borrow().clone();

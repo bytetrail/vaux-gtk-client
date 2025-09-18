@@ -3,13 +3,15 @@ use glib::{
     subclass::{object::ObjectImpl, types::ObjectSubclass},
 };
 use gtk4::subclass::prelude::DerivedObjectProperties;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 #[derive(glib::Properties, Default)]
 #[properties(wrapper_type = super::PacketObject)]
 pub struct PacketObject {
     #[property(construct, get, set)]
     pub packet_type: RefCell<String>,
+    #[property(construct, get, set)]
+    pub packet_id: Cell<i32>,
 }
 
 #[glib::object_subclass]

@@ -1,3 +1,4 @@
+mod action;
 mod client;
 mod message;
 mod model;
@@ -95,7 +96,8 @@ fn main() -> glib::ExitCode {
         sess_grid.attach(&credentials_frame, 1, row, 1, 1);
         session_frame.set_child(Some(&sess_grid));
 
-        let connect_frame = ui::build_actions(&clean_start_check, cmd_tx.clone(), &client_setting);
+        let connect_frame =
+            action::build_actions(&clean_start_check, cmd_tx.clone(), &client_setting);
         main_box.append(&connect_frame);
 
         let message_frame = message::build_message_view(Rc::clone(&message_model));

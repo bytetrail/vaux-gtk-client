@@ -18,6 +18,43 @@ const WILL_DELAY_MAX: f64 = 120.0; // 2 minutes
 const WILL_EXPIRY_MIN: f64 = 0.0; // 0 seconds
 const WILL_EXPIRY_MAX: f64 = 3600.0; // 1 hour
 
+pub fn build_connection_notebook(
+    client_setting: &ClientSetting,
+) -> (gtk::Notebook, gtk::CheckButton) {
+    let notebook = gtk::Notebook::new();
+    notebook.set_tab_pos(gtk::PositionType::Top);
+    notebook.set_scrollable(true);
+    notebook.set_margin_start(FRAME_MARGIN);
+    notebook.set_margin_end(FRAME_MARGIN);
+    notebook.set_margin_top(FRAME_MARGIN);
+    notebook.set_margin_bottom(FRAME_MARGIN);
+
+    let settings_frame = build_settings(client_setting);
+    notebook.append_page(
+        &settings_frame.0,
+        Some(&gtk::Label::new(Some("Connection"))),
+    );
+
+    let cred_frame = build_credentials(
+        Rc::clone(&client_setting.with_credentials),
+        Rc::clone(&client_setting.username),
+        Rc::clone(&client_setting.password),
+    );
+    notebook.append_page(&cred_frame, Some(&gtk::Label::new(Some("Credentials"))));
+
+    let tls_frame = build_tls(
+        Rc::clone(&client_setting.with_tls),
+        Rc::clone(&client_setting.ca_file),
+        Rc::clone(&client_setting.client_cert),
+    );
+    notebook.append_page(&tls_frame, Some(&gtk::Label::new(Some("TLS"))));
+
+    let will_frame = build_will(client_setting);
+    notebook.append_page(&will_frame, Some(&gtk::Label::new(Some("Will Message"))));
+
+    (notebook, settings_frame.1)
+}
+
 pub fn build_will(client_setting: &ClientSetting) -> gtk::Frame {
     let frame = gtk::Frame::new(Some("Will Message"));
 

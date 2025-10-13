@@ -1,5 +1,3 @@
-use glib::clone;
-use gtk::prelude::*;
 use gtk4::{self as gtk};
 
 pub mod action;

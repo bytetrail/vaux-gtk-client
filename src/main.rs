@@ -65,38 +65,14 @@ fn main() -> glib::ExitCode {
         main_box.set_spacing(10);
 
         let session_frame = gtk::Frame::new(Some("Session"));
+        session_frame.set_hexpand(true);
+        session_frame.set_vexpand(false);
+        let (connect_tabs, clean_start_check) = ui::build_connection_notebook(&client_setting);
+        session_frame.set_child(Some(&connect_tabs));
         main_box.append(&session_frame);
-        let sess_grid = gtk::Grid::new();
-        sess_grid.set_row_spacing(4);
-        sess_grid.set_column_spacing(4);
-        sess_grid.set_margin_start(10);
-        sess_grid.set_margin_end(10);
-        sess_grid.set_margin_top(10);
-        sess_grid.set_margin_bottom(10);
-        sess_grid.set_hexpand(true);
-        let mut row = 0;
 
-        let (client_setting_frame, clean_start_check) = ui::build_settings(&client_setting);
-        sess_grid.attach(&client_setting_frame, 0, row, 1, 1);
-        let will_frame = ui::build_will(&client_setting);
-        sess_grid.attach(&will_frame, 1, row, 1, 1);
-        row += 1;
-        let tls_frame = ui::build_tls(
-            Rc::clone(&client_setting.with_tls),
-            Rc::clone(&client_setting.ca_file),
-            Rc::clone(&client_setting.client_cert),
-        );
-        sess_grid.attach(&tls_frame, 0, row, 1, 1);
-        let credentials_frame = ui::build_credentials(
-            Rc::clone(&client_setting.with_credentials),
-            Rc::clone(&client_setting.username),
-            Rc::clone(&client_setting.password),
-        );
-        sess_grid.attach(&credentials_frame, 1, row, 1, 1);
-        session_frame.set_child(Some(&sess_grid));
-
-        let connect_frame = build_actions(&clean_start_check, cmd_tx.clone(), &client_setting);
-        main_box.append(&connect_frame);
+        let actions_frame = build_actions(&clean_start_check, cmd_tx.clone(), &client_setting);
+        main_box.append(&actions_frame);
 
         let message_frame = build_message_view(Rc::clone(&message_model));
         message_frame.set_vexpand(true);

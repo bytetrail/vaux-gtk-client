@@ -28,9 +28,12 @@ pub fn build_actions(
     grid.set_vexpand(false);
     grid.set_hexpand(true);
 
-    let row = 0;
+    let mut row = 0;
 
     let ping_button = gtk::Button::with_label("Ping");
+    ping_button.set_valign(gtk::Align::Center);
+    ping_button.set_hexpand(true);
+    ping_button.set_vexpand(false);
     // Make Ping button same width as Connect/Disconnect button
     ping_button.set_sensitive(false); // Initially disabled
     let conn_button = build_connect(
@@ -39,9 +42,13 @@ pub fn build_actions(
         client_settings,
         cmd_tx.clone(),
     );
+    conn_button.set_width_request(120);
+    conn_button.set_valign(gtk::Align::Center);
+    conn_button.set_hexpand(true);
+    conn_button.set_vexpand(false);
     grid.attach(&conn_button, 0, row, 1, 1);
-
-    grid.attach(&ping_button, 0, 1, 1, 1);
+    row += 1;
+    grid.attach(&ping_button, 0, row, 1, 1);
     let _cmd_tx = cmd_tx.clone();
     ping_button.connect_clicked(move |_| {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -55,10 +62,9 @@ pub fn build_actions(
             }
         }
     });
-
     // attach the subscribe frame to column 1, row, 0, 3 rows height
     let notebook = build_action_notebook(cmd_tx);
-    grid.attach(&notebook, 1, 0, 1, 3);
+    grid.attach(&notebook, 1, 0, 1, 8);
 
     frame.set_child(Some(&grid));
     frame

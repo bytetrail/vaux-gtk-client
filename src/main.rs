@@ -9,10 +9,11 @@ use gtk4 as gtk;
 
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, glib};
-use vaux_mqtt::{FixedHeader, Packet};
+use vaux_mqtt::{ Packet, PingResp};
 
 use crate::client::ClientSetting;
 use crate::model::PacketObject;
+use crate::model::packet::Exchange;
 use crate::ui::{build_actions, build_message_view};
 
 fn main() -> glib::ExitCode {
@@ -41,7 +42,7 @@ fn main() -> glib::ExitCode {
     let _message_model = Rc::clone(&message_model);
     glib::spawn_future_local(async move {
         while let Some(packet) = packet_rx.recv().await {
-            let packet_obj = PacketObject::new(packet);
+            let packet_obj = PacketObject::new(Exchange::Receive, packet);
             (*_message_model.borrow_mut()).append(&packet_obj);
         }
     });
@@ -79,9 +80,7 @@ fn main() -> glib::ExitCode {
 
         main_box.append(&message_frame);
 
-        let packet = PacketObject::new(Packet::PingResponse(FixedHeader::new(
-            vaux_mqtt::PacketType::PingResp,
-        )));
+        let packet = PacketObject::new(Exchange::Receive, Packet::PingResponse(PingResp::default()));
         (*message_model.borrow_mut()).append(&packet);
 
         window.set_child(Some(&main_box));

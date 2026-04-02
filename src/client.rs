@@ -97,8 +97,8 @@ pub async fn run(
                         println!("Received packet: {p:?}");
                         match &p {
                             vaux_mqtt::Packet::UnsubAck(ack) => {
-                                println!("UnsubAck received for packet ID: {}", ack.packet_id());
-                                for (i, code) in ack.reason_code().iter().enumerate() {
+                                println!("UnsubAck received for packet ID: {}", ack.packet_id);
+                                for (i, code) in ack.reason_code.iter().enumerate() {
                                     println!("  Reason code {}: {:?}", i + 1, code);
                                 }
                             }

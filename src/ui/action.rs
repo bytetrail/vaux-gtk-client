@@ -1,10 +1,11 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
+use bytes::BytesMut;
 use glib::clone;
 use gtk4::{self as gtk};
 
 use gtk::prelude::*;
-use vaux_mqtt::WillMessage;
+use vaux_mqtt::{WillMessage, codec::Encode};
 
 use crate::client::{self, ClientSetting, Command};
 
@@ -323,13 +324,13 @@ fn build_connect(
                         .with_auto_packet_id(*auto_packet_id.borrow())
                         .with_pingresp(*with_ping_resp.borrow());
                     if *with_will.borrow() {
-                        let mut will_msg =
-                            WillMessage::new(*will_qos.borrow(), *will_retain.borrow());
-                        will_msg.topic = (*will_topic).borrow().to_string();
-                        will_msg.payload = (*will_payload).borrow().as_bytes().to_vec();
-                        will_msg.set_delay(*will_delay.borrow());
-                        will_msg.set_expiry(*will_expiry.borrow());
-                        builder = builder.with_will_message(will_msg);
+                        let will_message = 
+                            WillMessage::new((*will_topic).borrow().to_string(), 
+                                (*will_payload).borrow().as_bytes(),
+                                (*will_qos).borrow().clone(), *will_retain.borrow())
+                                .with_delay(*will_delay.borrow())
+                                .with_message_expiry(*will_expiry.borrow());
+                        builder = builder.with_will_message(will_message);
                     };
 
                     let rt = tokio::runtime::Builder::new_current_thread()
@@ -445,6 +446,7 @@ fn build_publish(cmd_tx: tokio::sync::mpsc::Sender<Command>) -> gtk::Frame {
         } else {
             Some(packet_id_entry.value() as u16)
         };
+
         if topic.is_empty() {
             println!("Topic is empty, cannot publish");
             return;
@@ -463,7 +465,15 @@ fn build_publish(cmd_tx: tokio::sync::mpsc::Sender<Command>) -> gtk::Frame {
             );
             return;
         }
-        let publish = publish.unwrap();
+        let mut publish = publish.unwrap();
+        publish.message_expiry = Some(1000);
+        let mut dest = BytesMut::new();
+        let _ = publish.encode(&mut dest);
+        println!("Encoded publish packet: ");
+        for byte in dest.iter() {
+            print!("{:02x} ", byte);
+        }
+        println!();
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()

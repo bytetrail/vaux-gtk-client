@@ -8,11 +8,16 @@ use std::cell::{Cell, RefCell};
 #[derive(glib::Properties, Default)]
 #[properties(wrapper_type = super::PacketObject)]
 pub struct PacketObject {
+    
     #[property(construct, get, set)]
     pub packet_type: RefCell<String>,
     #[property(construct, get, set)]
     pub packet_id: Cell<i32>,
+    #[property(construct, get, set)]
+    pub timestamp: RefCell<String>,
 }
+
+
 
 #[glib::object_subclass]
 impl ObjectSubclass for PacketObject {

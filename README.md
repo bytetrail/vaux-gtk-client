@@ -21,3 +21,11 @@ _2025-07-22 screenshot of the Vaux GTK4 Test Client_
 
 ### Subscriptions
 Subscriptions are managed through the 'Subscriptions' tab in the main window. Users can add, remove, and manage subscriptions to various topics. Each subscription can be configured with a topic, QoS level, and whether it is active or not. Each subscription supports a single topic filter. Future versions may support multiple topic filters per subscription.
+
+
+## Mac Setup
+Use home brew to install GTK4
+
+```
+brew install gtk4
+```

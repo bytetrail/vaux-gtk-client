@@ -9,7 +9,30 @@ use gtk4::{
 use crate::model::PacketObject;
 
 pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Frame {
+
     let frame = gtk::Frame::new(Some("Messages"));
+    // Create a vertical box to hold headers and the list
+    let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    // Create header row
+    let header_box = gtk::Box::new(gtk::Orientation::Horizontal, 5);
+    let packet_header = gtk::Label::new(Some("Type"));
+    packet_header.set_hexpand(false);
+    packet_header.set_margin_bottom(4);
+    packet_header.set_markup("<b>Type</b>");
+    header_box.append(&packet_header);
+    let timestamp_header = gtk::Label::new(Some("Timestamp"));
+    timestamp_header.set_hexpand(false);
+    timestamp_header.set_margin_bottom(4);
+    timestamp_header.set_markup("<b>Timestamp</b>");
+    header_box.append(&timestamp_header);
+    let id_header = gtk::Label::new(Some("ID"));
+    id_header.set_hexpand(true);
+    id_header.set_margin_start(10);
+    id_header.set_margin_bottom(4);
+    id_header.set_markup("<b>ID</b>");
+    header_box.append(&id_header);
+
+    vbox.append(&header_box);
 
     let scrolled_window = gtk::ScrolledWindow::new();
     scrolled_window.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
@@ -25,6 +48,9 @@ pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Fr
         let packet_label = gtk::Label::new(None);
         packet_label.set_hexpand(false);
         hbox.append(&packet_label);
+        let timestamp_label = gtk::Label::new(None);
+        timestamp_label.set_hexpand(false);
+        hbox.append(&timestamp_label);
         let id_label = gtk::Label::new(None);
         id_label.set_margin_start(10);
         id_label.set_hexpand(true);
@@ -53,6 +79,12 @@ pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Fr
             .first_child()
             .and_downcast::<gtk::Label>()
             .expect("Failed to get packet_label");
+
+        let timestamp_label = packet_label
+            .next_sibling()
+            .and_downcast::<gtk::Label>()
+            .expect("Failed to get timestamp_label");
+
         let id_label = hbox
             .last_child()
             .and_downcast::<gtk::Label>()
@@ -60,6 +92,7 @@ pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Fr
 
         let id_str: String;
         packet_label.set_text(&packet.packet_type().to_string());
+        timestamp_label.set_text(&packet.timestamp().to_string());   
         id_label.set_text(if &packet.packet_id() == &0 {
             "-"
         } else {
@@ -74,7 +107,8 @@ pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Fr
     list_view.set_hexpand(true);
 
     scrolled_window.set_child(Some(&list_view));
-    frame.set_child(Some(&scrolled_window));
+    vbox.append(&scrolled_window);
+    frame.set_child(Some(&vbox));
 
     frame
 }

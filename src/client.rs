@@ -3,6 +3,8 @@ use tokio::{select, task::JoinHandle};
 use vaux_client::{ClientBuilder, MqttConnection, client::ClientError, session::SessionState};
 use vaux_mqtt::{QoSLevel, publish::Publish, unsubscribe};
 
+use crate::model::packet::Exchange;
+
 pub const DEFAULT_WILL_DELAY_SECONDS: u32 = 60; // 1 minute
 pub const DEFAULT_WILL_EXPIRY_SECONDS: u32 = 300; // 5 minutes
 
@@ -78,7 +80,7 @@ pub enum Command {
 }
 
 pub async fn run(
-    mqtt_tx: tokio::sync::mpsc::Sender<vaux_mqtt::Packet>,
+    mqtt_tx: tokio::sync::mpsc::Sender<(Exchange, vaux_mqtt::Packet)>,
     mut cmd_channel: tokio::sync::mpsc::Receiver<Command>,
 ) {
     let mut running = true;
@@ -94,7 +96,6 @@ pub async fn run(
             packet = packet_consumer.recv() => {
                 if let Some(p) = packet {
                         // Process the received packet
-                        println!("Received packet: {p:?}");
                         match &p {
                             vaux_mqtt::Packet::UnsubAck(ack) => {
                                 println!("UnsubAck received for packet ID: {}", ack.packet_id);
@@ -104,11 +105,10 @@ pub async fn run(
                             }
                             _ => {}
                         }
-                        // Here you can handle the packet, e.g., update UI or store it
-                        mqtt_tx.send(p).await.expect("Failed to send packet");
+                        mqtt_tx.send((Exchange::Receive, p)).await.expect("Failed to send packet");
                 }
             }
-            command = cmd_channel.recv() => {
+            command = cmd_channel.recv() => {                
                 match command {
                     Some(Command::ResumeSession(conn)) => {
                         // Logic to resume the session
@@ -157,6 +157,8 @@ pub async fn run(
                         if let Some(ref mut c) = client {
                             if let Err(e) = c.ping().await {
                                 eprintln!("Failed to send ping: {e}");
+                            } else {
+                                mqtt_tx.send((Exchange::Send, vaux_mqtt::Packet::PingRequest(vaux_mqtt::PingReq::default()))).await.expect("Failed to send ping packet");
                             }
                         } else {
                             eprintln!("Client not initialized, cannot send ping");
@@ -164,12 +166,14 @@ pub async fn run(
                     }
                     Some(Command::Publish(publish))=> {
                         let packet = vaux_mqtt::Packet::Publish(publish);
+                        let _packet = packet.clone();
                         println!("Publishing packet: {packet:?}");
                         if let Some(ref mut c) = client {
                             c.packet_producer()
                             .send(packet)
                             .await
                             .expect("Failed to send publish packet");
+                            mqtt_tx.send((Exchange::Send, _packet)).await.expect("Failed to send publish packet to UI");
                         } else {
                             eprintln!("Client not initialized, cannot publish");
                         }
@@ -191,11 +195,13 @@ pub async fn run(
                         // Logic to unsubscribe from a topic
                         println!("Unsubscribed from topic '{topic}'");
                         let unsub = unsubscribe::Unsubscribe::new(packet_id, vec![topic]);
+                        let _unsub = unsub.clone();
                         if let Some(ref mut c) = client {
                             c.packet_producer()
                             .send(vaux_mqtt::Packet::Unsubscribe(unsub))
                             .await
                             .expect("Failed to send unsubscribe packet");
+                            mqtt_tx.send((Exchange::Send, vaux_mqtt::Packet::Unsubscribe(_unsub))).await.expect("Failed to send unsubscribe packet to UI");
                         } else {
                             eprintln!("Client not initialized, cannot unsubscribe");
                         }

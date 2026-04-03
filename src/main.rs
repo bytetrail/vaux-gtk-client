@@ -41,8 +41,8 @@ fn main() -> glib::ExitCode {
     let message_model = Rc::new(RefCell::new(list_model));
     let _message_model = Rc::clone(&message_model);
     glib::spawn_future_local(async move {
-        while let Some(packet) = packet_rx.recv().await {
-            let packet_obj = PacketObject::new(Exchange::Receive, packet);
+        while let Some((dir, packet)) = packet_rx.recv().await {
+            let packet_obj = PacketObject::new(dir, packet);
             (*_message_model.borrow_mut()).append(&packet_obj);
         }
     });

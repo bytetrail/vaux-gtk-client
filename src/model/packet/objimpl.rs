@@ -8,7 +8,8 @@ use std::cell::{Cell, RefCell};
 #[derive(glib::Properties, Default)]
 #[properties(wrapper_type = super::PacketObject)]
 pub struct PacketObject {
-    
+    #[property(construct, get, set)]
+    pub exchange: RefCell<String>,
     #[property(construct, get, set)]
     pub packet_type: RefCell<String>,
     #[property(construct, get, set)]

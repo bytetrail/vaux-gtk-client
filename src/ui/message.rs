@@ -13,8 +13,13 @@ pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Fr
     let frame = gtk::Frame::new(Some("Messages"));
     // Create a vertical box to hold headers and the list
     let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    // Create header row
+    // Create header row with direction column
     let header_box = gtk::Box::new(gtk::Orientation::Horizontal, 5);
+    let direction_header = gtk::Label::new(Some(""));
+    direction_header.set_hexpand(false);
+    direction_header.set_margin_bottom(4);
+    direction_header.set_markup("<b>Dir</b>");
+    header_box.append(&direction_header);
     let packet_header = gtk::Label::new(Some("Type"));
     packet_header.set_hexpand(false);
     packet_header.set_margin_bottom(4);
@@ -45,6 +50,11 @@ pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Fr
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(move |_, item| {
         let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 5);
+        // Direction indicator
+        let direction_icon = gtk::DrawingArea::new();
+        direction_icon.set_content_width(24);
+        direction_icon.set_content_height(18);
+        hbox.append(&direction_icon);
         let packet_label = gtk::Label::new(None);
         packet_label.set_hexpand(false);
         hbox.append(&packet_label);
@@ -75,8 +85,81 @@ pub fn build_message_view(message_model: Rc<RefCell<gio::ListStore>>) -> gtk::Fr
             .and_downcast::<gtk::Box>()
             .expect("Failed to downcast to Box");
 
-        let packet_label = hbox
+        // Direction icon is the first child
+        let direction_icon = hbox
             .first_child()
+            .and_downcast::<gtk::DrawingArea>()
+            .expect("Failed to get direction_icon");
+
+        // Draw the direction icon
+        let exchange = packet.exchange();
+        direction_icon.set_draw_func(move |_, cr, width, height| {
+            use gtk4::gdk::RGBA;
+            use std::f64::consts::PI;
+            // Layout constants
+            let bar_x = 4.0;
+            let arrow_y = height as f64 / 2.0;
+            let arrow_len = width as f64 - bar_x - 8.0;
+            let head_size = 8.0;
+
+            // Draw vertical bar
+            cr.set_source_rgba(0.3, 0.3, 0.3, 1.0);
+            cr.set_line_width(2.0);
+            cr.move_to(bar_x, 2.0);
+            cr.line_to(bar_x, height as f64 - 2.0);
+            cr.stroke().unwrap();
+
+            if exchange == "send" {
+                // Arrowhead to the right of the bar, pointing left
+                cr.set_source_rgba(0.0, 0.5, 1.0, 1.0); // blue
+                cr.set_line_width(2.0);
+                // Arrowhead point at bar_x, wide ends to the right
+                let arrow_tip_x = bar_x + arrow_len;
+                let arrow_base_x = bar_x + 2.0;
+                // Shaft (hidden, just head)
+                // Arrowhead
+                cr.move_to(arrow_base_x, arrow_y);
+                cr.line_to(
+                    arrow_tip_x, arrow_y,
+                );
+                cr.move_to(arrow_tip_x, arrow_y);
+                cr.line_to(
+                    arrow_tip_x - head_size * (-(PI / 6.0)).cos(),
+                    arrow_y - head_size * (-(PI / 6.0)).sin(),
+                );
+                cr.move_to(arrow_tip_x, arrow_y);
+                cr.line_to(
+                    arrow_tip_x - head_size * (-(PI / 6.0)).cos(),
+                    arrow_y + head_size * (-(PI / 6.0)).sin(),
+                );
+                cr.stroke().unwrap();
+            } else {
+                // Arrowhead to the right of the bar, pointing left
+                cr.set_source_rgba(0.0, 1.0, 0.5, 1.0); // blue
+                cr.set_line_width(2.0);
+                // Arrowhead point at bar_x, wide ends to the right
+                let arrow_tip_x = bar_x + 2.0;
+                let arrow_base_x = bar_x + arrow_len;
+                cr.move_to(arrow_base_x, arrow_y);
+                cr.line_to(
+                    arrow_tip_x, arrow_y,
+                );
+                cr.move_to(arrow_tip_x, arrow_y);
+                cr.line_to(
+                    arrow_tip_x + head_size * (-(PI / 6.0)).cos(),
+                    arrow_y - head_size * (-(PI / 6.0)).sin(),
+                );
+                cr.move_to(arrow_tip_x, arrow_y);
+                cr.line_to(
+                    arrow_tip_x + head_size * (-(PI / 6.0)).cos(),
+                    arrow_y + head_size * (-(PI / 6.0)).sin(),
+                );
+                cr.stroke().unwrap();
+            }
+        });
+
+        let packet_label = direction_icon
+            .next_sibling()
             .and_downcast::<gtk::Label>()
             .expect("Failed to get packet_label");
 
